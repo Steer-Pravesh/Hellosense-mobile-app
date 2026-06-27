@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "lk5T5KPcOkGre0eEgQgex"
+uri = "file://artifacts/mobile/assets/images/icon.png"
+type = "image"
+title = "heliosense app icon shield sun"
