@@ -109,6 +109,7 @@ export default function CoachSessionScreen() {
     }
 
     hydrationTriggeredRef.current = true;
+    setRunning(false);
 
     const athleteIds = hydrationCandidates.map((athlete) => athlete.id);
     const names = hydrationCandidates.map((athlete) => athlete.name);
@@ -184,6 +185,28 @@ export default function CoachSessionScreen() {
     return () => clearInterval(reminderTimer);
   }, [activeHydrationAlert, followUpAlert, recordAlertAction, safetyAlerts]);
 
+  useEffect(() => {
+    if (activeHydrationAlert || followUpAlert) return;
+
+    const unresolvedAlert = safetyAlerts.find(
+      (alert) =>
+        alert.coachId === COACH_ID &&
+        alert.type === 'hydration_required' &&
+        ['active', 'hydrating'].includes(alert.status)
+    );
+
+    if (!unresolvedAlert) return;
+
+    setRunning(false);
+    hydrationTriggeredRef.current = true;
+
+    if (unresolvedAlert.status === 'hydrating') {
+      setFollowUpAlert(unresolvedAlert);
+    } else {
+      setActiveHydrationAlert(unresolvedAlert);
+    }
+  }, [activeHydrationAlert, followUpAlert, safetyAlerts]);
+
   const handleToggleOverride = (athleteId: string) => {
     setRosterOverrides((previous) => {
       const next = new Map(previous);
@@ -210,6 +233,13 @@ export default function CoachSessionScreen() {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
+
+    if (!running && elapsed === 0) {
+      hydrationTriggeredRef.current = false;
+      setActiveHydrationAlert(null);
+      setFollowUpAlert(null);
+    }
+
     setRunning((current) => !current);
   };
 
@@ -293,6 +323,10 @@ export default function CoachSessionScreen() {
         ? 'Athletes returned to active training.'
         : 'Athletes moved to recovery rest.'
     );
+
+    if (action === 'resume') {
+      setRunning(true);
+    }
 
     setFollowUpAlert(null);
   };
@@ -407,7 +441,7 @@ export default function CoachSessionScreen() {
             >
               <Feather name={running ? 'pause' : 'play'} size={18} color="#fff" />
               <Text style={styles.timerBtnText}>
-                {running ? 'Pause Timer' : 'Start Session'}
+                {running ? 'Pause Timer' : elapsed > 0 ? 'Resume Session' : 'Start Session'}
               </Text>
             </Pressable>
 
