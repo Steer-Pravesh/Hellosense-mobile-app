@@ -1,22 +1,55 @@
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import React, { useEffect, useRef, useState } from 'react';
-import { FlatList, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AISessionCard } from '@/components/AISessionCard';
 import { RiskBadge } from '@/components/RiskBadge';
+import { SessionRosterCard } from '@/components/SessionRosterCard';
+import { SessionEnvironmentPanel } from '@/components/SessionEnvironmentPanel';
 import { AthleteStatus, useApp } from '@/context/AppContext';
 import { useColors } from '@/hooks/useColors';
 
 export default function CoachSessionScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { athletes, updateAthleteStatus, markHydrated } = useApp();
+  const { athletes, envConditions, updateAthleteStatus, markHydrated } = useApp();
   const [elapsed, setElapsed] = useState(0);
   const [running, setRunning] = useState(false);
+  const [rosterOverrides, setRosterOverrides] = useState<Map<string, boolean>>(new Map());
+  const [aiPlanApplied, setAiPlanApplied] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const myAthletes = athletes.filter((a) => a.coachId === 'c1');
-  const inSession = myAthletes.filter((a) => !['not_in_session', 'session_ended'].includes(a.status));
+
+  const rosterAthletes = useMemo(
+    () => myAthletes.filter((a) => a.status !== 'session_ended'),
+    [myAthletes]
+  );
+
+  const excludedIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const a of rosterAthletes) {
+      const override = rosterOverrides.get(a.id);
+      const excluded = override !== undefined ? !override : a.safetyLevel === 'critical';
+      if (excluded) ids.add(a.id);
+    }
+    return ids;
+  }, [rosterAthletes, rosterOverrides]);
+
+  const handleToggleOverride = (athleteId: string) => {
+    setRosterOverrides((prev) => {
+      const next = new Map(prev);
+      const currentlyExcluded = excludedIds.has(athleteId);
+      // Flip: if currently excluded, override to include (true); if included, override to exclude (false).
+      next.set(athleteId, currentlyExcluded);
+      return next;
+    });
+  };
+
+  const inSession = rosterAthletes.filter(
+    (a) => !excludedIds.has(a.id) && !['not_in_session', 'session_ended'].includes(a.status)
+  );
 
   useEffect(() => {
     if (running) {
@@ -43,7 +76,7 @@ export default function CoachSessionScreen() {
 
   const handleEndAll = () => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    myAthletes.forEach((a) => {
+    rosterAthletes.forEach((a) => {
       if (!['not_in_session', 'session_ended'].includes(a.status)) {
         updateAthleteStatus(a.id, 'session_ended', 'Session Ended by Coach', 'Coach Raj Mehta');
       }
@@ -69,6 +102,30 @@ export default function CoachSessionScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: 100 + (Platform.OS === 'web' ? 34 : insets.bottom) }} showsVerticalScrollIndicator={false}>
+        <SessionEnvironmentPanel env={envConditions} />
+
+        <AISessionCard
+          athletes={rosterAthletes}
+          env={envConditions}
+          onApply={() => setAiPlanApplied(true)}
+          onAdjust={() => setAiPlanApplied(false)}
+        />
+
+        {aiPlanApplied && (
+          <View style={[styles.appliedBanner, { backgroundColor: colors.safeLight, borderColor: colors.safe + '44' }]}>
+            <Feather name="check-circle" size={16} color={colors.safe} />
+            <Text style={[styles.appliedText, { color: colors.safeFg }]}>AI plan applied to today&apos;s session. Live risk changes will still trigger coach alerts.</Text>
+          </View>
+        )}
+
+        <View style={{ marginBottom: 16 }}>
+          <SessionRosterCard
+            athletes={rosterAthletes}
+            overrides={rosterOverrides}
+            onToggleOverride={handleToggleOverride}
+          />
+        </View>
+
         <View style={[styles.timerCard, { backgroundColor: colors.nav }]}>
           <Text style={[styles.timerLabel, { color: 'rgba(255,255,255,0.6)' }]}>SESSION TIMER</Text>
           <Text style={styles.timerValue}>{formatTime(elapsed)}</Text>
@@ -86,6 +143,7 @@ export default function CoachSessionScreen() {
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.nav }]}>Athletes in Session ({inSession.length})</Text>
+          <Text style={[styles.sectionSub, { color: colors.mutedForeground }]}>Critical-risk athletes are excluded automatically — see roster above</Text>
           {inSession.map((athlete) => (
             <View key={athlete.id} style={[styles.athleteRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={styles.athleteLeft}>
@@ -182,6 +240,8 @@ const styles = StyleSheet.create({
   actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   actionCard: { width: '30%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 14, borderWidth: 1, gap: 6, flexGrow: 1 },
   actionLabel: { fontSize: 11, fontWeight: '600' as const },
+  appliedBanner: { marginHorizontal: 16, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 12, padding: 11 },
+  appliedText: { flex: 1, fontSize: 11, lineHeight: 16, fontWeight: '600' as const },
   hydrationSection: { margin: 16, borderRadius: 16, borderWidth: 1, padding: 16, gap: 10 },
   hydrationHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   hydrationTitle: { fontSize: 15, fontWeight: '700' as const },

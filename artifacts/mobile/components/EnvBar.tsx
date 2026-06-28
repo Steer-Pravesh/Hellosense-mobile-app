@@ -26,7 +26,7 @@ export function EnvBar({ env, compact = false }: Props) {
       <View style={[styles.compact, { backgroundColor: colors.nav }]}>
         <EnvPill icon="sun" value={`UV ${env.uvIndex.toFixed(1)}`} color={uvColor} />
         <EnvPill icon="thermometer" value={`${env.temperature}°C`} color={heatColor} />
-        <EnvPill icon="droplets" value={`${env.humidity}% RH`} color={colors.recovery} />
+        <EnvPill icon="droplet" value={`${env.humidity}% RH`} color={colors.recovery} />
         <EnvPill
           icon="alert-triangle"
           value={env.heatRisk.toUpperCase()}

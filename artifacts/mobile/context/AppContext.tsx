@@ -103,7 +103,9 @@ interface AppContextType {
   setDemoBooking: (booking: DemoBooking | null) => void;
   updateAthleteStatus: (athleteId: string, status: AthleteStatus, action: string, coachName: string) => void;
   markHydrated: (athleteId: string) => void;
+  addSessionRecord: (record: SessionHistory) => void;
   activeAlertsCount: number;
+  getAlertsCountForCoach: (coachId: string) => number;
   parentAthleteId: string;
   hasParentSubscription: boolean;
   setHasParentSubscription: (val: boolean) => void;
@@ -298,6 +300,7 @@ const ENV: EnvConditions = {
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [role, setRoleState] = useState<UserRole>(null);
   const [athletes, setAthletes] = useState<Athlete[]>(INITIAL_ATHLETES);
+  const [sessionHistory, setSessionHistory] = useState<SessionHistory[]>(INITIAL_HISTORY);
   const [demoBooking, setDemoBooking] = useState<DemoBooking | null>(null);
   const [hasParentSubscription, setHasParentSubscription] = useState(false);
 
@@ -364,9 +367,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
+  const addSessionRecord = useCallback((record: SessionHistory) => {
+    setSessionHistory((prev) => [record, ...prev]);
+  }, []);
+
   const activeAlertsCount = athletes.filter(
     (a) => a.safetyLevel === 'critical' || a.safetyLevel === 'caution'
   ).length;
+
+  const getAlertsCountForCoach = useCallback(
+    (coachId: string) =>
+      athletes.filter(
+        (a) =>
+          a.coachId === coachId &&
+          (a.safetyLevel === 'critical' || a.safetyLevel === 'caution')
+      ).length,
+    [athletes]
+  );
 
   return (
     <AppContext.Provider
@@ -375,13 +392,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setRole,
         athletes,
         coaches: INITIAL_COACHES,
-        sessionHistory: INITIAL_HISTORY,
+        sessionHistory,
         envConditions: ENV,
         demoBooking,
         setDemoBooking,
         updateAthleteStatus,
         markHydrated,
+        addSessionRecord,
         activeAlertsCount,
+        getAlertsCountForCoach,
         parentAthleteId: 'a1',
         hasParentSubscription,
         setHasParentSubscription: (val: boolean) => {

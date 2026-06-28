@@ -10,7 +10,6 @@ import { useApp } from '@/context/AppContext';
 import { useColors } from '@/hooks/useColors';
 
 function NativeCoachTabs() {
-  const { activeAlertsCount } = useApp();
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="index">
@@ -39,7 +38,8 @@ function ClassicCoachTabs() {
   const isDark = colorScheme === 'dark';
   const isIOS = Platform.OS === 'ios';
   const isWeb = Platform.OS === 'web';
-  const { activeAlertsCount } = useApp();
+  const { getAlertsCountForCoach } = useApp();
+  const alertsCount = getAlertsCountForCoach('c1');
 
   return (
     <Tabs
@@ -81,7 +81,7 @@ function ClassicCoachTabs() {
         name="alerts"
         options={{
           title: 'Alerts',
-          tabBarBadge: activeAlertsCount > 0 ? activeAlertsCount : undefined,
+          tabBarBadge: alertsCount > 0 ? alertsCount : undefined,
           tabBarIcon: ({ color }) =>
             isIOS ? <SymbolView name="bell" tintColor={color} size={22} /> : <Feather name="bell" size={22} color={color} />,
         }}
