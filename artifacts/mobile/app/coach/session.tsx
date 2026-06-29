@@ -411,7 +411,7 @@ export default function CoachSessionScreen() {
           >
             <Feather name="check-circle" size={16} color={colors.safe} />
             <Text style={[styles.appliedText, { color: colors.safeFg }]}>
-              AI plan applied. Body metrics, recovery and hydration thresholds are now being monitored.
+              AI session risk preview locked. Planned load, hydration interval and watch-athlete rules are now active for this session.
             </Text>
           </View>
         )}
