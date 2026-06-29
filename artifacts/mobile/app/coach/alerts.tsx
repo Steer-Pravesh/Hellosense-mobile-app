@@ -10,15 +10,15 @@ import { useColors } from '@/hooks/useColors';
 export default function CoachAlertsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { athletes, hydrationAlerts } = useApp();
+  const { athletes, hydrationAlerts, activeCoachId } = useApp();
   const [alertAthlete, setAlertAthlete] = useState<Athlete | null>(null);
 
-  const myAthletes = athletes.filter((a) => a.coachId === 'c1');
+  const myAthletes = athletes.filter((a) => a.coachId === activeCoachId);
   const alerts = myAthletes.filter((a) => a.safetyLevel === 'critical' || a.safetyLevel === 'caution');
   const critical = alerts.filter((a) => a.safetyLevel === 'critical');
   const caution = alerts.filter((a) => a.safetyLevel === 'caution');
 
-  const myHydrationAlerts = hydrationAlerts.filter((al) => al.coachId === 'c1');
+  const myHydrationAlerts = hydrationAlerts.filter((al) => al.coachId === activeCoachId);
   const activeHydrationAlerts = myHydrationAlerts.filter(
     (al) => al.status === 'pending' || al.status === 'snoozed'
   );

@@ -1,8 +1,9 @@
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Image,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -26,7 +27,11 @@ interface RoleCard {
 export default function RoleSelectScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { setRole } = useApp();
+  const { setRole, coaches, athletes, setActiveCoachId, setParentAthleteId } = useApp();
+  // When the person picks Coach or Parent, we show a one-step picker (which coach /
+  // which athlete's parent) before navigating in, rather than silently always landing
+  // on the same hardcoded coach/athlete regardless of who's actually using the app.
+  const [pickerFor, setPickerFor] = useState<'coach' | 'parent' | null>(null);
 
   const roles: RoleCard[] = [
     {
@@ -56,8 +61,26 @@ export default function RoleSelectScreen() {
   ];
 
   const handleSelect = (role: RoleCard) => {
+    if (role.id === 'coach' || role.id === 'parent') {
+      setPickerFor(role.id);
+      return;
+    }
     setRole(role.id);
     router.push(`/${role.id}` as any);
+  };
+
+  const handlePickCoach = (coachId: string) => {
+    setActiveCoachId(coachId);
+    setRole('coach');
+    setPickerFor(null);
+    router.push('/coach' as any);
+  };
+
+  const handlePickParentAthlete = (athleteId: string) => {
+    setParentAthleteId(athleteId);
+    setRole('parent');
+    setPickerFor(null);
+    router.push('/parent' as any);
   };
 
   return (
@@ -168,6 +191,52 @@ export default function RoleSelectScreen() {
           </Pressable>
         </View>
       </ScrollView>
+
+      <Modal visible={pickerFor !== null} transparent animationType="fade" onRequestClose={() => setPickerFor(null)}>
+        <Pressable style={pickerStyles.overlay} onPress={() => setPickerFor(null)}>
+          <Pressable style={[pickerStyles.sheet, { backgroundColor: colors.card }]} onPress={(e) => e.stopPropagation()}>
+            <Text style={[pickerStyles.title, { color: colors.foreground }]}>
+              {pickerFor === 'coach' ? 'Which coach are you?' : "Which athlete's parent are you?"}
+            </Text>
+            <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
+              {pickerFor === 'coach'
+                ? coaches.map((c) => (
+                    <Pressable
+                      key={c.id}
+                      style={[pickerStyles.option, { borderColor: colors.border }]}
+                      onPress={() => handlePickCoach(c.id)}
+                    >
+                      <View style={[pickerStyles.optionIcon, { backgroundColor: colors.primary + '15' }]}>
+                        <Feather name="user-check" size={18} color={colors.primary} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[pickerStyles.optionTitle, { color: colors.foreground }]}>{c.name}</Text>
+                        <Text style={[pickerStyles.optionSub, { color: colors.mutedForeground }]}>{c.sport}</Text>
+                      </View>
+                    </Pressable>
+                  ))
+                : athletes.map((a) => (
+                    <Pressable
+                      key={a.id}
+                      style={[pickerStyles.option, { borderColor: colors.border }]}
+                      onPress={() => handlePickParentAthlete(a.id)}
+                    >
+                      <View style={[pickerStyles.optionIcon, { backgroundColor: colors.recovery + '15' }]}>
+                        <Feather name="heart" size={18} color={colors.recovery} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[pickerStyles.optionTitle, { color: colors.foreground }]}>{a.name}</Text>
+                        <Text style={[pickerStyles.optionSub, { color: colors.mutedForeground }]}>{a.sport} · Age {a.age}</Text>
+                      </View>
+                    </Pressable>
+                  ))}
+            </ScrollView>
+            <Pressable style={pickerStyles.cancelBtn} onPress={() => setPickerFor(null)}>
+              <Text style={[pickerStyles.cancelText, { color: colors.mutedForeground }]}>Cancel</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -238,4 +307,16 @@ const styles = StyleSheet.create({
   demoSub: { fontSize: 13, textAlign: 'center', lineHeight: 20 },
   demoLargeBtn: { flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 14, paddingHorizontal: 28, paddingVertical: 15, marginTop: 6 },
   demoLargeBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' as const },
+});
+
+const pickerStyles = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
+  sheet: { borderRadius: 20, padding: 18, gap: 12, maxHeight: '70%' },
+  title: { fontSize: 17, fontWeight: '700' as const, marginBottom: 4 },
+  option: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: 14, padding: 12, marginBottom: 10 },
+  optionIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  optionTitle: { fontSize: 14, fontWeight: '600' as const },
+  optionSub: { fontSize: 12, marginTop: 1 },
+  cancelBtn: { alignItems: 'center', paddingVertical: 10 },
+  cancelText: { fontSize: 14, fontWeight: '600' as const },
 });

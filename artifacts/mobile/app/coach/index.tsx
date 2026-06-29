@@ -14,12 +14,13 @@ type Filter = 'all' | SafetyLevel;
 export default function CoachAthletesScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { athletes, envConditions } = useApp();
+  const { athletes, envConditions, activeCoachId, coaches } = useApp();
   const [filter, setFilter] = useState<Filter>('all');
   const [search, setSearch] = useState('');
   const [alertAthlete, setAlertAthlete] = useState<Athlete | null>(null);
 
-  const myAthletes = athletes.filter((a) => a.coachId === 'c1');
+  const activeCoach = coaches.find((c) => c.id === activeCoachId);
+  const myAthletes = athletes.filter((a) => a.coachId === activeCoachId);
   const filtered = myAthletes.filter((a) => {
     const matchFilter = filter === 'all' || a.safetyLevel === filter;
     const matchSearch = a.name.toLowerCase().includes(search.toLowerCase()) || a.sport.toLowerCase().includes(search.toLowerCase());
@@ -51,7 +52,7 @@ export default function CoachAthletesScreen() {
             </Pressable>
             <View style={styles.headerTitle}>
               <Text style={styles.headerName}>Coach Dashboard</Text>
-              <Text style={styles.headerSub}>Raj Mehta · Football, Athletics, Cricket</Text>
+              <Text style={styles.headerSub}>{activeCoach?.name.replace('Coach ', '') ?? 'Coach'} · {activeCoach?.sport ?? ''}</Text>
             </View>
             <View style={[styles.alertBadge, { backgroundColor: colors.critical }]}>
               <Text style={styles.alertBadgeText}>{myAthletes.filter((a) => a.safetyLevel === 'critical').length}</Text>

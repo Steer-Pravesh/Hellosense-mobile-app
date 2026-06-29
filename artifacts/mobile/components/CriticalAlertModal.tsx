@@ -31,7 +31,8 @@ interface CoachAction {
 export function CriticalAlertModal({ athlete, visible, onClose }: Props) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { updateAthleteStatus } = useApp();
+  const { updateAthleteStatus, activeCoachId, coaches } = useApp();
+  const coachName = coaches.find((c) => c.id === activeCoachId)?.name ?? 'Coach';
 
   const ACTIONS: CoachAction[] = [
     { id: 'resting', label: 'Give Rest', icon: 'moon', description: 'Stop activity, allow recovery', color: colors.safe },
@@ -47,7 +48,7 @@ export function CriticalAlertModal({ athlete, visible, onClose }: Props) {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     }
-    updateAthleteStatus(athlete.id, action.id, action.label, 'Coach Raj Mehta');
+    updateAthleteStatus(athlete.id, action.id, action.label, coachName);
     onClose();
   };
 

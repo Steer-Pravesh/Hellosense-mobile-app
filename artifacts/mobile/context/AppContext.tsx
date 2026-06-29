@@ -129,6 +129,9 @@ export type UserRole = 'coach' | 'academy' | 'parent' | null;
 interface AppContextType {
   role: UserRole;
   setRole: (role: UserRole) => void;
+  /** Which coach is currently logged in — drives every coach screen's "myAthletes" filter. */
+  activeCoachId: string;
+  setActiveCoachId: (coachId: string) => void;
   athletes: Athlete[];
   coaches: Coach[];
   sessionHistory: SessionHistory[];
@@ -150,6 +153,7 @@ interface AppContextType {
   /** Count of critical/caution athletes scoped to a single coach — use this for per-coach badges. */
   getAlertsCountForCoach: (coachId: string) => number;
   parentAthleteId: string;
+  setParentAthleteId: (athleteId: string) => void;
   hasParentSubscription: boolean;
   setHasParentSubscription: (val: boolean) => void;
 }
@@ -358,6 +362,8 @@ const ENV: EnvConditions = {
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [role, setRoleState] = useState<UserRole>(null);
+  const [activeCoachId, setActiveCoachIdState] = useState<string>('c1');
+  const [parentAthleteId, setParentAthleteIdState] = useState<string>('a1');
   const [athletes, setAthletes] = useState<Athlete[]>(INITIAL_ATHLETES);
   const [sessionHistory, setSessionHistory] = useState<SessionHistory[]>(INITIAL_HISTORY);
   const [hydrationAlerts, setHydrationAlerts] = useState<HydrationAlert[]>([]);
@@ -371,11 +377,49 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.getItem('hs_parent_sub').then((v) => {
       if (v === 'true') setHasParentSubscription(true);
     });
+    AsyncStorage.getItem('hs_active_coach').then((c) => {
+      if (c) setActiveCoachIdState(c);
+    });
+    AsyncStorage.getItem('hs_parent_athlete').then((p) => {
+      if (p) setParentAthleteIdState(p);
+    });
+  }, []);
+
+  // Every 15s, re-check snoozed hydration alerts and flip any whose snoozeUntil has
+  // passed back to 'pending' — this is what actually makes "remind me in 10 min" fire
+  // again, rather than the alert silently sitting snoozed forever until a coach notices
+  // it on the Alerts screen.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setHydrationAlerts((prev) => {
+        let changed = false;
+        const next = prev.map((al) => {
+          if (al.status === 'snoozed' && al.snoozeUntil && new Date(al.snoozeUntil).getTime() <= now) {
+            changed = true;
+            return { ...al, status: 'pending' as HydrationAlertStatus, snoozeUntil: undefined };
+          }
+          return al;
+        });
+        return changed ? next : prev;
+      });
+    }, 15000);
+    return () => clearInterval(interval);
   }, []);
 
   const setRole = useCallback((r: UserRole) => {
     setRoleState(r);
     if (r) AsyncStorage.setItem('hs_role', r);
+  }, []);
+
+  const setActiveCoachId = useCallback((coachId: string) => {
+    setActiveCoachIdState(coachId);
+    AsyncStorage.setItem('hs_active_coach', coachId);
+  }, []);
+
+  const setParentAthleteId = useCallback((athleteId: string) => {
+    setParentAthleteIdState(athleteId);
+    AsyncStorage.setItem('hs_parent_athlete', athleteId);
   }, []);
 
   const updateAthleteStatus = useCallback(
@@ -555,6 +599,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       value={{
         role,
         setRole,
+        activeCoachId,
+        setActiveCoachId,
         athletes,
         coaches: INITIAL_COACHES,
         sessionHistory,
@@ -570,7 +616,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         markHydrated,
         activeAlertsCount,
         getAlertsCountForCoach,
-        parentAthleteId: 'a1',
+        parentAthleteId,
+        setParentAthleteId,
         hasParentSubscription,
         setHasParentSubscription: (val: boolean) => {
           setHasParentSubscription(val);

@@ -3,7 +3,7 @@ import * as Haptics from 'expo-haptics';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AISessionCard } from '@/components/AISessionCard';
+import { AISessionCard, Recommendation } from '@/components/AISessionCard';
 import { HydrationAlertModal } from '@/components/HydrationAlertModal';
 import { RiskBadge } from '@/components/RiskBadge';
 import { SessionRosterCard } from '@/components/SessionRosterCard';
@@ -24,7 +24,11 @@ export default function CoachSessionScreen() {
     addSessionRecord,
     hydrationAlerts,
     triggerHydrationAlert,
+    activeCoachId,
+    coaches,
   } = useApp();
+  const activeCoach = coaches.find((c) => c.id === activeCoachId);
+  const coachName = activeCoach?.name ?? 'Coach';
   const [elapsed, setElapsed] = useState(0);
   const [running, setRunning] = useState(false);
   const [rosterOverrides, setRosterOverrides] = useState<Map<string, boolean>>(new Map());
@@ -36,8 +40,11 @@ export default function CoachSessionScreen() {
   // post-hydration ("resume or rest") step of that alert's flow.
   const [activeModalAlertId, setActiveModalAlertId] = useState<string | null>(null);
   const [awaitingPostHydration, setAwaitingPostHydration] = useState(false);
+  // Set when the coach taps "Apply to session plan" on the AI card — drives the
+  // applied-confirmation state on that card and the target duration shown on the timer.
+  const [appliedRecommendation, setAppliedRecommendation] = useState<Recommendation | null>(null);
 
-  const myAthletes = athletes.filter((a) => a.coachId === 'c1');
+  const myAthletes = athletes.filter((a) => a.coachId === activeCoachId);
 
   const rosterAthletes = useMemo(
     () => myAthletes.filter((a) => a.status !== 'session_ended'),
@@ -83,7 +90,7 @@ export default function CoachSessionScreen() {
       const activelyTraining = a.status === 'training' || a.status === 'sprint_drill';
       if (activelyTraining && !checkedAthleteIds.current.has(a.id)) {
         checkedAthleteIds.current.add(a.id);
-        triggerHydrationAlert(a.id, 'c1');
+        triggerHydrationAlert(a.id, activeCoachId);
       }
     });
   }, [elapsed, running, inSession, triggerHydrationAlert]);
@@ -128,6 +135,26 @@ export default function CoachSessionScreen() {
       : `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
   };
 
+  const handleApplyRecommendation = (rec: Recommendation) => {
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setAppliedRecommendation(rec);
+    // A "low" recommendation actually throttles in-session athletes back to reduced
+    // intensity — moderate/high recommendations are guidance only and don't force a
+    // status change, since coaches are already running training/sprint drills at will.
+    if (rec.intensity === 'low') {
+      inSession.forEach((a) => {
+        if (a.status === 'training' || a.status === 'sprint_drill') {
+          updateAthleteStatus(a.id, 'reduced_intensity', 'AI Recommendation Applied — Reduced Intensity', coachName);
+        }
+      });
+    }
+  };
+
+  const handleAdjustManually = () => {
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setAppliedRecommendation(null);
+  };
+
   const handleToggle = () => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setRunning((r) => !r);
@@ -153,8 +180,8 @@ export default function CoachSessionScreen() {
           date: endedAt,
           duration: elapsed > 0 ? Math.round(elapsed / 60) : a.trainingDuration,
           safetyIncidents,
-          coachId: 'c1',
-          coachName: 'Raj Mehta',
+          coachId: activeCoachId,
+          coachName: coachName.replace('Coach ', ''),
           summary:
             a.safetyLevel === 'critical'
               ? 'Session ended with an unresolved critical risk flag.'
@@ -163,7 +190,7 @@ export default function CoachSessionScreen() {
               : 'Full session, safe completion.',
         });
 
-        updateAthleteStatus(a.id, 'session_ended', 'Session Ended by Coach', 'Coach Raj Mehta');
+        updateAthleteStatus(a.id, 'session_ended', 'Session Ended by Coach', coachName);
       }
     });
     setRunning(false);
@@ -190,11 +217,17 @@ export default function CoachSessionScreen() {
 
       <View style={[styles.header, { backgroundColor: colors.nav, paddingTop: Platform.OS === 'web' ? 67 : insets.top }]}>
         <Text style={styles.headerTitle}>Session Control</Text>
-        <Text style={styles.headerSub}>Coach Raj Mehta · {inSession.length} athletes in session</Text>
+        <Text style={styles.headerSub}>{coachName} · {inSession.length} athletes in session</Text>
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: 100 + (Platform.OS === 'web' ? 34 : insets.bottom) }} showsVerticalScrollIndicator={false}>
-        <AISessionCard athletes={rosterAthletes} env={envConditions} />
+        <AISessionCard
+          athletes={rosterAthletes}
+          env={envConditions}
+          onApply={handleApplyRecommendation}
+          onAdjust={handleAdjustManually}
+          applied={!!appliedRecommendation}
+        />
 
         <View style={{ marginBottom: 16 }}>
           <SessionRosterCard
@@ -207,6 +240,11 @@ export default function CoachSessionScreen() {
         <View style={[styles.timerCard, { backgroundColor: colors.nav }]}>
           <Text style={[styles.timerLabel, { color: 'rgba(255,255,255,0.6)' }]}>SESSION TIMER</Text>
           <Text style={styles.timerValue}>{formatTime(elapsed)}</Text>
+          {appliedRecommendation && (
+            <Text style={[styles.timerTarget, { color: colors.secondary }]}>
+              Target: {appliedRecommendation.durationMin} min · {appliedRecommendation.intensity} intensity
+            </Text>
+          )}
           <View style={styles.timerBtns}>
             <Pressable style={[styles.timerBtn, { backgroundColor: running ? colors.caution : colors.safe }]} onPress={handleToggle}>
               <Feather name={running ? 'pause' : 'play'} size={18} color="#fff" />
@@ -257,7 +295,7 @@ export default function CoachSessionScreen() {
                 onPress={() => {
                   if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   inSession.forEach((a) =>
-                    updateAthleteStatus(a.id, action.id, action.label, 'Coach Raj Mehta')
+                    updateAthleteStatus(a.id, action.id, action.label, coachName)
                   );
                 }}
               >
@@ -301,6 +339,7 @@ const styles = StyleSheet.create({
   timerCard: { margin: 16, borderRadius: 20, padding: 24, alignItems: 'center', gap: 6 },
   timerLabel: { fontSize: 11, fontWeight: '600' as const, letterSpacing: 1 },
   timerValue: { color: '#fff', fontSize: 48, fontWeight: '800' as const, letterSpacing: -1 },
+  timerTarget: { fontSize: 12, fontWeight: '600' as const, marginTop: -2 },
   timerBtns: { flexDirection: 'row', gap: 10, marginTop: 12 },
   timerBtn: { flexDirection: 'row', gap: 8, alignItems: 'center', borderRadius: 12, paddingHorizontal: 18, paddingVertical: 11 },
   timerBtnText: { color: '#fff', fontWeight: '700' as const, fontSize: 14 },

@@ -28,6 +28,17 @@ export default function AcademyCoachesScreen() {
           const critical = coachAthletes.filter((a) => a.safetyLevel === 'critical');
           const caution = coachAthletes.filter((a) => a.safetyLevel === 'caution');
           const history = sessionHistory.filter((s) => s.coachId === item.id);
+          // Same calculation as the Coach Response Record on the Reports screen — keeps
+          // the two screens consistent instead of one being real data and one being a placeholder.
+          const incidentSessions = history.filter((h) => h.safetyIncidents > 0);
+          const unresolvedSessions = incidentSessions.filter((h) =>
+            h.summary.toLowerCase().includes('unresolved')
+          ).length;
+          const responseRate =
+            incidentSessions.length === 0
+              ? 100
+              : Math.round(((incidentSessions.length - unresolvedSessions) / incidentSessions.length) * 100);
+          const responseLabel = responseRate >= 90 ? 'Excellent' : responseRate >= 70 ? 'Good' : 'Needs Improvement';
 
           return (
             <View style={[styles.card, { backgroundColor: colors.card, borderColor: critical.length > 0 ? colors.critical + '44' : colors.border }]}>
@@ -71,7 +82,7 @@ export default function AcademyCoachesScreen() {
               <View style={styles.responseRow}>
                 <Feather name="clock" size={13} color={colors.mutedForeground} />
                 <Text style={[styles.responseText, { color: colors.mutedForeground }]}>
-                  {history.length} sessions recorded · Coach response: Excellent
+                  {history.length} sessions recorded · Coach response: {responseLabel} ({responseRate}%)
                 </Text>
               </View>
             </View>

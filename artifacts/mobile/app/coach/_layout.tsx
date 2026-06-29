@@ -38,8 +38,8 @@ function ClassicCoachTabs() {
   const isDark = colorScheme === 'dark';
   const isIOS = Platform.OS === 'ios';
   const isWeb = Platform.OS === 'web';
-  const { getAlertsCountForCoach } = useApp();
-  const alertsCount = getAlertsCountForCoach('c1');
+  const { getAlertsCountForCoach, activeCoachId } = useApp();
+  const alertsCount = getAlertsCountForCoach(activeCoachId);
 
   return (
     <Tabs

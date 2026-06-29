@@ -8,13 +8,15 @@ import { useColors } from '@/hooks/useColors';
 interface Props {
   athletes: Athlete[];
   env: EnvConditions;
-  onApply?: () => void;
+  onApply?: (rec: Recommendation) => void;
   onAdjust?: () => void;
+  /** Shows an "Applied" state instead of the action buttons once the coach has applied this recommendation. */
+  applied?: boolean;
 }
 
 type RecommendedIntensity = 'low' | 'moderate' | 'high';
 
-interface Recommendation {
+export interface Recommendation {
   intensity: RecommendedIntensity;
   loadPercent: number;
   durationMin: number;
@@ -75,7 +77,7 @@ const INTENSITY_LABEL: Record<RecommendedIntensity, string> = {
   high: 'High',
 };
 
-export function AISessionCard({ athletes, env, onApply, onAdjust }: Props) {
+export function AISessionCard({ athletes, env, onApply, onAdjust, applied }: Props) {
   const colors = useColors();
   const rec = buildRecommendation(athletes, env);
 
@@ -84,7 +86,7 @@ export function AISessionCard({ athletes, env, onApply, onAdjust }: Props) {
 
   const handleApply = () => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    onApply?.();
+    onApply?.(rec);
   };
 
   const handleAdjust = () => {
@@ -109,14 +111,21 @@ export function AISessionCard({ athletes, env, onApply, onAdjust }: Props) {
         <Text style={styles.reasonText}>{rec.reason}</Text>
       </View>
 
-      <View style={styles.btnRow}>
-        <Pressable style={[styles.applyBtn, { backgroundColor: colors.secondary }]} onPress={handleApply}>
-          <Text style={styles.applyBtnText}>Apply to session plan</Text>
-        </Pressable>
-        <Pressable style={styles.adjustBtn} onPress={handleAdjust}>
-          <Text style={styles.adjustBtnText}>Adjust manually</Text>
-        </Pressable>
-      </View>
+      {applied ? (
+        <View style={[styles.appliedRow, { backgroundColor: 'rgba(34,197,94,0.15)' }]}>
+          <Feather name="check-circle" size={15} color={colors.safe} />
+          <Text style={[styles.appliedText, { color: colors.safe }]}>Applied to session plan</Text>
+        </View>
+      ) : (
+        <View style={styles.btnRow}>
+          <Pressable style={[styles.applyBtn, { backgroundColor: colors.secondary }]} onPress={handleApply}>
+            <Text style={styles.applyBtnText}>Apply to session plan</Text>
+          </Pressable>
+          <Pressable style={styles.adjustBtn} onPress={handleAdjust}>
+            <Text style={styles.adjustBtnText}>Adjust manually</Text>
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 }
@@ -168,6 +177,8 @@ const styles = StyleSheet.create({
   reasonBox: { borderRadius: 10, padding: 12 },
   reasonText: { color: 'rgba(255,255,255,0.85)', fontSize: 12, lineHeight: 18 },
   btnRow: { flexDirection: 'row', gap: 8 },
+  appliedRow: { flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 10, paddingVertical: 11 },
+  appliedText: { fontSize: 13, fontWeight: '700' as const },
   applyBtn: { flex: 1, borderRadius: 10, paddingVertical: 11, alignItems: 'center' },
   applyBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' as const },
   adjustBtn: {
